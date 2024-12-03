@@ -6,7 +6,7 @@ interface DestinationCardProps {
   image: any;
   title: string;
   location: string;
-  rating: string;
+  rating: number;
 }
 
 export default function DestinationCard({ image, title, location, rating }: DestinationCardProps) {

@@ -1,3 +1,4 @@
+import { Destination } from '../components/Destinations';
 export type RootStackParamList = {
   Home: undefined;
   Profile: undefined;
@@ -6,18 +7,7 @@ export type RootStackParamList = {
   Splash : undefined;
   Login : undefined;
   SignUp : undefined;
-  ArticlePage: {
-    place: {
-      id: number;
-      title: string;
-      image: any;
-      location: string;
-      description: string;
-      rating: string;
-      attractions: string[];
-      bestTimeToVisit: string;
-    };
-  };
+  ArticlePage: { place: Destination };
   ConversationListPage: undefined;
   Favourites:undefined;
   ConversationPage: {

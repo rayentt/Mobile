@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore'; // Import required Firestore functions
+
 import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation} from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
+import { QueryDocumentSnapshot } from 'firebase/firestore';
 // Import components
 import DestinationCard from './DestinationCard';
 import MightlikeCard from './MightlikeCard';
@@ -18,7 +21,13 @@ import Destinations from './Destinations'
 import Flight from './Flight';
 import ConversationListPage from './ConversationListPage';
 import Favourites from './Favourites';
-
+interface Destination {
+  id: string,
+  name: string;
+  location: string;
+  rating: number;
+  image_url: string;
+}
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -76,7 +85,37 @@ function TopNavigationHeader({
 }
 // Placeholder components for different tabs
 function FlightScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();// State to store fetched destinations
+  const [destinations, setDestinations] = useState<Destination[]>([]); // Define the type as an array of Destination objects
+
+  useEffect(() => {
+    // Fetch the data when the component is mounted
+    const fetchDestinations = async () => {
+      try {
+        const destinationCollection = collection(db, 'destinations');
+    const destinationSnapshot = await getDocs(destinationCollection);
+
+        // Map over the documents and extract the data
+        const destinationList = destinationSnapshot.docs.map((doc: QueryDocumentSnapshot)  => {
+          const data = doc.data() as Destination;
+          return {
+            id: doc.id,
+            name: data.name,
+            location: data.location,  // Adjust based on your Firestore structure
+            rating: data.rating,
+            image_url: data.image_url, // Assuming the URL is stored in Firestore
+          };
+        });
+
+        setDestinations(destinationList); // Set the fetched data to state
+      } catch (error) {
+        console.error("Error fetching destinations: ", error);
+      }
+    };
+
+    fetchDestinations(); // Call the function to fetch destinations
+  }, []);
+
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
@@ -97,25 +136,16 @@ function FlightScreen() {
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <DestinationCard
-            image={require('../assets/sahara.png')}
-            title="Sahara Douz"
-            location="Kébili"
-            rating="6.9"
-          />
-          <DestinationCard
-            image={require('../assets/chatt.png')}
-            title="Chatt Mariem"
-            location="Sousse"
-            rating="8.8"
-          />
-          <DestinationCard
-            image={require('../assets/tabarka.png')}
-            title="Tabarka"
-            location="Jendouba"
-            rating="4.8"
-          />
-        </ScrollView>
+      {destinations.map((destination) => (
+        <DestinationCard
+          key={destination.id} // Use the document ID as the key for better performance
+          image={{ uri: destination.image_url }} // Display image from URL
+          title={destination.name}
+          location={destination.location}
+          rating={destination.rating} // Convert rating to string if needed
+        />
+      ))}
+    </ScrollView>
       </View>
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -215,7 +245,6 @@ function GuideScreen() {
 function DestinationScreen() {
   return (
   <View style={styles.tabContainer}>
-    <Text>Destination Screen</Text>
   </View>
   );
 }
