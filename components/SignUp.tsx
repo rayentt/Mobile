@@ -1,26 +1,78 @@
 import React, { useState } from 'react';
 import { SafeAreaView, Text, TextInput, TouchableOpacity, StyleSheet, View, Alert,Image,ImageBackground} from 'react-native';
+import { auth } from '../firebase.js';
+import { createUserWithEmailAndPassword , onAuthStateChanged} from "firebase/auth";
+import { db } from '../firebase.js';
+import { collection, addDoc } from 'firebase/firestore';
+import { FirebaseError } from 'firebase/app'; 
 
-const SignUp  = ({ navigation }: any) => {
+
+const SignUp = ({ navigation }: any) => {
   const [form, setForm] = useState({
     email: '',
     password: '',
     confirmPassword: '',
-    nationality: '',        // New field
-    dateOfBirth: '',        // New field
+    nationality: '',        
+    dateOfBirth: '',        
     gender: '', 
   });
-
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     // Vérification si les mots de passe correspondent
     if (form.password !== form.confirmPassword) {
       Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
-    } else {
-      Alert.alert('Succès', 'Compte créé avec succès');
+      return; // Exit early if passwords don't match
+    }
+
+    try {
+      // Create user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      const user = userCredential.user;
+      console.log('User signed up:', user);
+
+      // Use onAuthStateChanged to ensure the user is authenticated before writing to Firestore
+      onAuthStateChanged(auth, async (authenticatedUser) => {
+        if (authenticatedUser) {
+          try {
+            // Save additional data in Firestore
+            await addDoc(collection(db, 'users'), {
+              uid: authenticatedUser.uid,
+              email: form.email,
+              nationality: form.nationality,
+              dateOfBirth: form.dateOfBirth,
+              createdAt: new Date().toISOString(),
+            });
+            console.log('User data added to Firestore');
+            
+            // Show success message and navigate
+            Alert.alert('Succès', 'Compte créé avec succès');
+            navigation.navigate('Home'); // Replace 'Home' with your target screen
+          } catch (error) {
+            if (error instanceof FirebaseError) {
+              // Handle Firebase specific errors
+              console.error('Firebase Error:', error.message);
+              Alert.alert('Erreur', `Erreur Firebase: ${error.message}`);
+            } else {
+              console.error('Unknown error:', error);
+              Alert.alert('Erreur', 'Une erreur inconnue est survenue.');
+            }
+          }
+        } else {
+          console.error('User not authenticated');
+        }
+      });
+      
+    } catch (error) {
+      // TypeScript wants the error type to be more specific
+      if (error instanceof Error) {
+        console.error('Error:', error.message); // Handle general errors
+        Alert.alert('Erreur', `Erreur: ${error.message}`);
+      } else {
+        console.error('Unknown error:', error); // If the error isn't an instance of Error
+        Alert.alert('Erreur', 'Une erreur inconnue est survenue.');
+      }
     }
   };
-
-  return (
+   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground
         source={require('../assets/sidibo.jpg')} // Replace with your background image
