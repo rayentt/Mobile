@@ -60,7 +60,7 @@ export default function AppNavigator() {
           name="ArticlePage" 
           component={ArticlePage} 
           options={({ route }) => ({ 
-            title: route.params.place.title,
+            title: route.params.place.name,
             headerBackTitle: 'Back'
           })}
         />

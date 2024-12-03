@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -6,64 +6,64 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   SafeAreaView, 
-  ScrollView 
+  ScrollView, 
+  ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation'; // Adjust path as needed
-import ArticlePage from './ArticlePage';
+import { RootStackParamList } from '../types/navigation'; 
+import { db } from '../firebase.js'; // Adjust path as needed
+import { collection, getDocs } from 'firebase/firestore';
 
 // Define navigation type
 type DestinationsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Destinations'>;
-
+export interface Review {
+  user: string;       // User who wrote the review
+  comment: string;    // Review text
+  stars: number;      // Rating in stars
+  date: string;       // Date of the review (ISO string)
+}
 // Destination data type
-interface Destination {
-  id: number;
-  title: string;
-  image: any;
+export interface Destination {
+  id: string; // Firestore document ID
+  name: string;
+  image_url: string; // URL of the image from Firestore
   location: string;
   description: string;
-  rating: string;
+  rating: number;
   attractions: string[];
   bestTimeToVisit: string;
-}
+  phrase:string;
+  opening_hours:string;
+  reviews: Review[];
 
-const destinationsData: Destination[] = [
-  {
-    id: 1,
-    title: 'Sahara Douz',
-    image: require('../assets/sahara.png'),
-    location: 'Kébili',
-    description: 'Gateway to the Sahara Desert, known for its golden dunes and traditional Bedouin culture',
-    rating: '6.9',
-    attractions: ['Desert Treks', 'Camel Rides', 'Cultural Experiences'],
-    bestTimeToVisit: 'October to April',
-  },
-  {
-    id: 2,
-    title: 'Amphitheatre of El Jem',
-    image: require('../assets/eljem.png'),
-    location: 'Mahdia',
-    description: 'A UNESCO World Heritage site, one of the best-preserved Roman amphitheatres in the world',
-    rating: '8.9',
-    attractions: ['Historical Tours', 'Archaeological Site', 'Photography'],
-    bestTimeToVisit: 'Spring and Autumn',
-  },
-  {
-    id: 3,
-    title: 'Medina of Yasmine Hammamet',
-    image: require('../assets/yasmine.png'),
-    location: 'Nabeul',
-    description: 'A picturesque medina combining traditional architecture with stunning Mediterranean views',
-    rating: '8.9',
-    attractions: ['Historic Walking Tours', 'Local Crafts', 'Coastal Views'],
-    bestTimeToVisit: 'May to September',
-  }
-];
+}
 
 const Destinations: React.FC = () => {
   const navigation = useNavigation<DestinationsScreenNavigationProp>();
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch data from Firestore
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'destinations'));
+        const data = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Destination[];
+        setDestinations(data);
+      } catch (error) {
+        console.error("Error fetching destinations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDestinations();
+  }, []);
 
   // Handle card press
   const handleViewPress = (place: Destination) => {
@@ -77,11 +77,11 @@ const Destinations: React.FC = () => {
       style={styles.destinationCard}
       onPress={() => handleViewPress(destination)}
     >
-      <Image source={destination.image} style={styles.destinationImage} />
+      <Image source={{ uri: destination.image_url }} style={styles.destinationImage} />
       <View style={styles.destinationCardOverlay}>
         <View style={styles.destinationCardHeader}>
           <View>
-            <Text style={styles.destinationName}>{destination.title}</Text>
+            <Text style={styles.destinationName}>{destination.name}</Text>
             <View style={styles.locationContainer}>
               <Ionicons name="location" size={16} color="white" />
               <Text style={styles.locationText}>{destination.location}</Text>
@@ -93,7 +93,7 @@ const Destinations: React.FC = () => {
           </View>
         </View>
         <Text style={styles.destinationDescription} numberOfLines={2}>
-          {destination.description}
+          {destination.phrase}
         </Text>
         <View style={styles.attractionsContainer}>
           {destination.attractions.map((attraction, index) => (
@@ -110,6 +110,7 @@ const Destinations: React.FC = () => {
     </TouchableOpacity>
   );
 
+  // Render loading spinner or destination list
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -122,15 +123,19 @@ const Destinations: React.FC = () => {
         <Text style={styles.searchPlaceholder}>Search destinations...</Text>
       </View>
 
-      <ScrollView 
-        style={styles.destinationsContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {destinationsData.map(renderDestinationCard)}
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator size="large" color="#336749" style={{ marginTop: 20 }} />
+      ) : (
+        <ScrollView 
+          style={styles.destinationsContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {destinations.map(renderDestinationCard)}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
-}
+};
 
 
 

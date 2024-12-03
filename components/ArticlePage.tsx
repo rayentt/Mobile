@@ -7,14 +7,10 @@ import { Feather } from '@expo/vector-icons';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
+import { Destination } from '../components/Destinations';
+import DestinationReview  from './DestinationReview'; // Import the DestinationReview component
 
-interface Review {
-  id: string;
-  username: string;
-  text: string;
-  rating: number;
-  date: string;
-}
+
 type ArticlePageRouteProp = RouteProp<RootStackParamList, 'ArticlePage'>;
 type ArticlePageProps = {
   route: ArticlePageRouteProp;
@@ -22,128 +18,47 @@ type ArticlePageProps = {
 
 const ArticlePage = ({ route }: ArticlePageProps) => {
   const { place } = route.params;
-  const [reviews, setReviews] = useState<Review[]>([
-    {
-      id: '1',
-      username: 'John Doe',
-      text: 'Amazing place! Highly recommended.',
-      rating: 5,
-      date: '2024-01-15'
-    },
-    {
-      id: '2',
-      username: 'Jane Smith',
-      text: 'Good experience, but could be improved.',
-      rating: 4,
-      date: '2024-02-20'
-    }
-  ]);
 
-  // State for new review input
-  const [newReview, setNewReview] = useState('');
-  const [newRating, setNewRating] = useState(5);
 
-  // Function to add a new review
-  const addReview = () => {
-    if (newReview.trim() === '') return;
-
-    const reviewToAdd: Review = {
-      id: String(reviews.length + 1),
-      username: 'Current User', // In a real app, this would be the logged-in user
-      text: newReview,
-      rating: newRating,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    setReviews([...reviews, reviewToAdd]);
-    setNewReview('');
-    setNewRating(5);
-  };
-   // Render individual review item
-   const renderReviewItem = ({ item }: { item: Review }) => (
-    <View style={styles.reviewItem}>
-      <View style={styles.reviewHeader}>
-        <Text style={styles.reviewUsername}>{item.username}</Text>
-        <View style={styles.reviewRating}>
-          {[...Array(item.rating)].map((_, i) => (
-            <Feather key={i} name="star" size={16} color="#FFD700" />
-          ))}
-        </View>
-      </View>
-      <Text style={styles.reviewText}>{item.text}</Text>
-      <Text style={styles.reviewDate}>{item.date}</Text>
-    </View>
-  );
-   // Rating selector component
-   const RatingSelector = () => (
-    <View style={styles.ratingSelector}>
-      {[1, 2, 3, 4, 5].map((rating) => (
-        <TouchableOpacity 
-          key={rating} 
-          onPress={() => setNewRating(rating)}
-        >
-          <Feather 
-            name="star" 
-            size={24} 
-            color={rating <= newRating ? "#FFD700" : "#E0E0E0"} 
-          />
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
 
   return(
     <ScrollView style={styles.container}>
-      <Image source={place.image} style={styles.heroImage} />
+      <Image source={{ uri: place.image_url}} style={styles.heroImage} />
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>{place.title}</Text>
+          <Text style={styles.title}>{place.name}</Text>
           <View style={styles.rating}>
             <Feather name="star" size={24} color="#FFD700" />
             <Text style={styles.ratingText}>{place.rating}</Text>
           </View>
         </View>
-        <Text style={styles.description}>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Text>
+        <View style={styles.attractionsContainer}>
+          {place.attractions.map((attraction, index) => (
+            <View key={index} style={styles.attractionPill}>
+              <Text style={styles.attractionText}>{attraction}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={styles.description}>{place.phrase}</Text>
+      
     
         <View style={styles.infoContainer}>
           <View style={styles.infoItem}>
             <Feather name="map-pin" size={24} color="#007A8C" />
-            <Text style={styles.infoText}>bahtha darkom</Text>
+            <Text style={styles.infoText}>{place.location}</Text>
           </View>
           <View style={styles.infoItem}>
             <Feather name="clock" size={24} color="#007A8C" />
-            <Text style={styles.infoText}>24 Hour</Text>
+            <Text style={styles.infoText}>{place.opening_hours}</Text>
           </View>
-        </View>
+          </View>
+          <Text style={styles.description}>{place.description}</Text>
+       
           {/* Reviews Section */}
           <View style={styles.reviewsSection}>
           <Text style={styles.reviewsSectionTitle}>Reviews</Text>
           
-          {/* Review Input */}
-          <View style={styles.reviewInputContainer}>
-            <TextInput
-              style={styles.reviewInput}
-              placeholder="Write your review..."
-              multiline
-              value={newReview}
-              onChangeText={setNewReview}
-            />
-            <RatingSelector />
-            <TouchableOpacity 
-              style={styles.submitReviewButton}
-              onPress={addReview}
-            >
-              <Text style={styles.submitReviewButtonText}>Submit Review</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Reviews List */}
-          <FlatList
-            data={reviews}
-            renderItem={renderReviewItem}
-            keyExtractor={(item) => item.id}
-            style={styles.reviewsList}
-          />
+          <DestinationReview destinationId={place.id} />
         </View>
       </View>
     </ScrollView>
@@ -193,15 +108,19 @@ const styles = StyleSheet.create({
   infoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 5,
+    
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 7,
   },
   infoText: {
     marginLeft: 8,
     fontSize: 18,
     color: '#007A8C',
+    
   },
   reviewsSection: {
     marginTop: 20,
@@ -255,6 +174,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  attractionText: {
+    color: '#336749',
+    fontSize: 12,
+  },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -273,6 +196,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     marginBottom: 8,
+  },
+  attractionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  attractionPill: {
+    backgroundColor: '#E6F2EC',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    margin: 4,
   },
   reviewDate: {
     fontSize: 14,
