@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert } from 'react-native';
 import { getIconName, getBottomIconName } from '../constants/icons';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,11 +7,112 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation'; // adjust path as needed
+import { collection, doc, getDoc, getDocs, getFirestore, query, updateDoc, where } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { firestore } from '@/firebase';
+import { Destination } from './Destinations';
 type favouritesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Favourites'>;
+
+interface ProfileData {
+  name: string;
+  email: string;
+  dateOfBirth: string;
+  country: string;
+  region: string;
+  points: number;
+  level: string;
+  favouritesIds:string[];
+}
+
+
 
 const Favourites = () => {
     const navigation = useNavigation<favouritesScreenNavigationProp>();
-  const [favouritePlaces, setFavouritePlaces] = useState([
+    const db = getFirestore();
+    const auth = getAuth();
+    const [favouriteDestinations, setFavouriteDestinations] = useState<Destination[]>([]);
+    const [profileData, setProfileData] = useState<ProfileData>({
+      name: '',
+      email: '',
+      dateOfBirth: '',
+      country: '',
+      region: '',
+      points: 0,
+      level: '',
+      favouritesIds:[],
+    });
+
+
+    const fetchFavorites = async () => {
+      const user = getAuth().currentUser;
+      if (user) {
+        // Requête Firestore pour récupérer l'utilisateur par UID
+        const q = query(collection(db, 'users'), where('uid', '==', user.uid));
+        try {
+          const querySnapshot = await getDocs(q);
+          
+  
+          if (!querySnapshot.empty) {
+            const docSnap = querySnapshot.docs[0]; // On suppose qu'il n'y a qu'un seul document
+            const data = docSnap.data();
+            const favouritesIds = data?.favourites || []; 
+            
+            setProfileData({
+              name: data?.name || '',
+              email: data?.email || '',
+              dateOfBirth: data?.dateOfBirth || '',
+              country: data?.country || '',
+              region: data?.region || '',
+              points: data?.points || 0,
+              level: data?.level || '',
+              favouritesIds,
+            });
+            
+            
+            
+            
+  
+            // On va récupérer toutes les destinations en fonction des IDs dans favourites
+            const fetchedDestinations: Destination[] = []; // Initialisation d'un tableau pour les destinations
+  
+            // Pour chaque ID de destination, on va chercher la destination correspondante
+            for (const id of favouritesIds) {
+              if (id) { // S'assurer que l'ID est valide
+                const destinationRef = doc(firestore, 'destinations', id);
+                const destinationSnap = await getDoc(destinationRef);
+    
+                if (destinationSnap.exists()) {
+                  console.log(destinationSnap.data());
+                  const destinationData = destinationSnap.data() as Destination;
+                  fetchedDestinations.push(destinationData);
+                }
+              }
+            }
+    
+            // Mettre à jour l'état avec les destinations récupérées
+            setFavouriteDestinations(fetchedDestinations);
+          } else {
+            console.log('Aucun utilisateur trouvé');
+            Alert.alert('Aucun utilisateur trouvé, veuillez vérifier si l\'utilisateur est bien enregistré.');
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération des données utilisateur :', error);
+          Alert.alert('Erreur lors de la récupération des données utilisateur. Veuillez réessayer plus tard.');
+        }
+      }
+    };
+
+
+    useEffect(() => {
+      fetchFavorites();
+    }, []);
+
+
+
+
+    
+
+  {/*const [favouritePlaces, setFavouritePlaces] = useState([
     {
       id: '1',
       name: 'Tabarka ',
@@ -34,7 +135,7 @@ const Favourites = () => {
       rating: '4.7',
     },
   ]);
-
+*/}
   const handlePlaceAction = (id: string, action: string) => {
     if (action === 'remove') {
       Alert.alert(
@@ -47,10 +148,57 @@ const Favourites = () => {
           },
           {
             text: 'Yes',
-            onPress: () => {
-              setFavouritePlaces((prev) =>
-                prev.filter((place) => place.id !== id)
-              );
+            onPress: async() => {
+              const user = getAuth().currentUser;
+              if (user) {
+                try {
+                  // Requête Firestore pour récupérer l'utilisateur par UID
+                  const q = query(collection(firestore, 'users'), where('uid', '==', user.uid));
+                  const querySnapshot = await getDocs(q);
+  
+                  if (!querySnapshot.empty) {
+                    const docSnap = querySnapshot.docs[0]; // Récupère le premier document de l'utilisateur
+                    const userDocRef = doc(firestore, 'users', docSnap.id); // Référence du document utilisateur
+                    const data = docSnap.data(); // Récupère les données du document
+                    //console.log(data);
+
+                    console.log('Hi there');
+  
+                    if (data && data.favourites) {
+                      // Filtrer les favoris pour supprimer le lieu en fonction de son nom
+                      const updatedFavourites = data.favourites.filter((fav: string) => fav !== id);
+  
+                      // Affichage des nouveaux favoris après suppression
+                     
+                      // console.log('Updated Favourites:', updatedFavourites);
+  
+                      // Mise à jour du champ "favourites" dans Firestore uniquement si la liste a changé
+                      if (updatedFavourites.length !== data.favourites.length) {
+                        console.log("GHHHHHHHHHHHHHHHHHHH");
+                        await updateDoc(userDocRef, {
+                          favourites: updatedFavourites,
+                        });
+                      }
+  
+                      // Mise à jour de l'état local après modification de Firestore
+                      setFavouriteDestinations((prev) =>
+                        prev.filter((place) => place.name !== id) // Filtrer par le nom du lieu
+                      );
+  
+                      // Optionnel : Confirmer la suppression via un message à l'utilisateur
+                      Alert.alert('Success', 'The place has been removed from your favourites.');
+                    } else {
+                      console.error('No favourites found in user data');
+                    }
+                  } else {
+                    console.error('User document not found in Firestore');
+                    Alert.alert('Error', 'User document not found.');
+                  }
+                } catch (error) {
+                  console.error('Error removing destination from favourites:', error);
+                  Alert.alert('Error removing destination. Please try again later.');
+                }
+              }
             },
           },
         ]
@@ -67,11 +215,11 @@ const Favourites = () => {
       </View>
 
       <FlatList
-        data={favouritePlaces}
+        data={favouriteDestinations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.placeContainer}>
-            <Image source={item.image} style={styles.placeImage} />
+             <Image source={{ uri: item.image_url }} style={styles.placeImage} />
             <View style={styles.placeInfo}>
               <Text style={styles.placeName}>{item.name}</Text>
               <Text style={styles.placeState}>{item.state}</Text>

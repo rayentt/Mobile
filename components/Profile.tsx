@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect,  } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,12 @@ import {
   Image,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getFirestore, doc, getDoc, updateDoc, query , collection, where, getDocs } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { firestore } from '../firebase';
 
 interface ProfileData {
   name: string;
@@ -23,16 +27,121 @@ interface ProfileData {
 
 const Profile = ({ navigation }: any) => {
   const [profileData, setProfileData] = useState<ProfileData>({
-    name: 'Rana Chouchane',
-    email: 'rana.chouchane@supcom.tn',
-    dateOfBirth: '25/04/2002',
-    country: 'Tunisia',
-    region: 'Gafsa',
-    points: 1200,
-    level: 'Gold Traveler'
+    name: '',
+    email: '',
+    dateOfBirth: '',
+    country: '',
+    region: '',
+    points: 0,
+    level: ''
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const auth = getAuth();
+  {/*const currentUser = auth.currentUser;
+  const documentId = "PC9WYssZCZjoMvexEQbU";*/}
+
+
+  useEffect(() => {
+    // Listen for changes in authentication state
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in
+        getUserProfile(user.uid); // Fetch profile data using the user's UID
+        console.log(user.uid);
+        const userRef = doc(firestore, "users", user.uid); 
+        console.log(userRef);
+      } else {
+        // User is signed out
+        setProfileData({
+          name: '',
+          email: '',
+          dateOfBirth: '',
+          country: '',
+          region: '',
+          points: 0,
+          level: '',
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+
+
+  const getUserProfile = async (userId: string) => {
+    const q = query(collection(firestore, 'users'), where('uid', '==', userId));
+
+    // Référence au document de l'utilisateur dans la collection 'users'
+    const userRef = doc(firestore, "users", "QrbMxf2UX8W4D80J7KW5"); 
+  
+    try {
+      // Récupère les documents correspondants à la requête
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // Si le document existe, on peut obtenir les données
+        const docSnap = querySnapshot.docs[0]; // On suppose qu'il n'y a qu'un seul document
+        const data = docSnap.data();
+        setProfileData({
+          name: data?.name || '',
+          email: data?.email || '',
+          dateOfBirth: data?.dateOfBirth || '',
+          country: data?.country || '',
+          region: data?.region || '',
+          points: data?.points || 0,
+          level: data?.level || '',
+        });
+      } else {
+        console.log('No such document!');
+        Alert.alert('No user data found. Please check if the user is properly registered.');
+      }
+    } catch (error) {
+      console.error('Error getting document:', error);
+      Alert.alert('Error retrieving user data. Please try again later.');
+    }
+  };
+
+  
+ 
+
+  const updateProfile = async () => {
+    const user = auth.currentUser;
+    
+    if (user) {
+      const q = query(collection(firestore, 'users'), where('uid', '==', user.uid));
+      try {
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0]; // On suppose qu'il n'y a qu'un seul document
+          const userRef = doc(firestore, 'users', docSnap.id); // Utilise l'ID du document récupéré
+
+          // Mise à jour du document avec les nouvelles données
+          await updateDoc(userRef, {
+            name: profileData.name,
+            email: profileData.email,
+            dateOfBirth: profileData.dateOfBirth,
+            country: profileData.country,
+            region: profileData.region,
+            points: profileData.points,
+            level: profileData.level,
+          });
+          
+          Alert.alert('Profile updated successfully!');
+          setIsEditing(false);
+        }
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        Alert.alert('Error updating profile. Please try again later.');
+      }
+    }
+  };
+
+
+
+
 
   const getLevelColor = (points: number) => {
     if (points >= 2000) return '#FFD700'; // Gold
@@ -75,6 +184,7 @@ const Profile = ({ navigation }: any) => {
               style={styles.input}
               value={profileData.name}
               editable={isEditing}
+              onChangeText={(text) => setProfileData({ ...profileData, name: text })}
             />
           </View>
 
@@ -84,7 +194,9 @@ const Profile = ({ navigation }: any) => {
               style={styles.input}
               value={profileData.email}
               editable={isEditing}
+              onChangeText={(text) => setProfileData({ ...profileData, email: text })}
               keyboardType="email-address"
+              
             />
           </View>
 
@@ -94,6 +206,7 @@ const Profile = ({ navigation }: any) => {
               style={styles.input}
               value={profileData.dateOfBirth}
               editable={isEditing}
+              onChangeText={(text) => setProfileData({ ...profileData, dateOfBirth: text })}
             />
           </View>
 
@@ -103,6 +216,7 @@ const Profile = ({ navigation }: any) => {
               style={styles.input}
               value={profileData.country}
               editable={isEditing}
+              onChangeText={(text) => setProfileData({ ...profileData, country: text })}
             />
           </View>
 
@@ -112,13 +226,20 @@ const Profile = ({ navigation }: any) => {
               style={styles.input}
               value={profileData.region}
               editable={isEditing}
+              onChangeText={(text) => setProfileData({ ...profileData, region: text })}
             />
           </View>
         </View>
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => setIsEditing(!isEditing)}
+          onPress={() => {
+            if (isEditing) {
+              updateProfile();
+            } else {
+              setIsEditing(true);
+            }
+          }}
         >
           <Text style={styles.buttonText}>
             {isEditing ? 'Save Changes' : 'Edit Profile'}

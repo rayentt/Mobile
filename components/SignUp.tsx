@@ -12,10 +12,17 @@ const SignUp = ({ navigation }: any) => {
     email: '',
     password: '',
     confirmPassword: '',
-    nationality: '',        
+    country: '',        
     dateOfBirth: '',        
     gender: '', 
   });
+
+  const getNameFromEmail = (email: string) => {
+    const name = email.split('@')[0]; 
+    return name.charAt(0).toUpperCase() + name.slice(1); // Met la première lettre en majuscule
+  }
+
+
   const handleSignUp = async () => {
     // Vérification si les mots de passe correspondent
     if (form.password !== form.confirmPassword) {
@@ -29,6 +36,8 @@ const SignUp = ({ navigation }: any) => {
       const user = userCredential.user;
       console.log('User signed up:', user);
 
+      const name = getNameFromEmail(form.email);
+
       // Use onAuthStateChanged to ensure the user is authenticated before writing to Firestore
       onAuthStateChanged(auth, async (authenticatedUser) => {
         if (authenticatedUser) {
@@ -37,9 +46,10 @@ const SignUp = ({ navigation }: any) => {
             await addDoc(collection(db, 'users'), {
               uid: authenticatedUser.uid,
               email: form.email,
-              nationality: form.nationality,
+              country: form.country,
               dateOfBirth: form.dateOfBirth,
               createdAt: new Date().toISOString(),
+              name,
             });
             console.log('User data added to Firestore');
             
@@ -104,10 +114,10 @@ const SignUp = ({ navigation }: any) => {
           onChangeText={confirmPassword => setForm({ ...form, confirmPassword })}
         />
     <TextInput
-          placeholder="Nationality"
+          placeholder="Country"
           style={styles.input}
-          value={form.nationality}
-          onChangeText={nationality => setForm({ ...form, nationality })}
+          value={form.country}
+          onChangeText={country => setForm({ ...form, country })}
         />
     <TextInput
           placeholder="Date of birth

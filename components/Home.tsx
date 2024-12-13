@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore'; // Import required Firestore functions
+import { collection, doc, getDocs, query, where } from 'firebase/firestore'; // Import required Firestore functions
 
-import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation} from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,6 +11,8 @@ import { QueryDocumentSnapshot } from 'firebase/firestore';
 import DestinationCard from './DestinationCard';
 import MightlikeCard from './MightlikeCard';
 import PromotionCard from './PromotionCard';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { firestore } from '../firebase';
 
 // Import utility functions
 import { getIconName, getBottomIconName } from '../constants/icons';
@@ -29,26 +31,54 @@ interface Destination {
   image_url: string;
 }
 
+interface ProfileData {
+  name: string;
+  email: string;
+  dateOfBirth: string;
+  country: string;
+  region: string;
+  points: number;
+  level: string;
+}
+
+
+
+
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function TopNavigationHeader({ 
   navigation, 
   topNavIndex, 
   setTopNavIndex, 
-  topNavTabs 
+  topNavTabs, 
+  profileData
 }: {
   navigation: HomeScreenNavigationProp,
   topNavIndex: number,
   setTopNavIndex: (index: number) => void,
   topNavTabs: Array<{name: string, icon: string}>
+  profileData: ProfileData
 }) {
   return (
     <>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hi, Rana</Text>
+          <Text style={styles.greeting}>Hi, {profileData.name || 'Guest'}</Text>
           <View style={styles.pointsContainer}>
-            <Text style={styles.points}>1,200 points</Text>
+            <Text style={styles.points}>{profileData.points} points</Text>
           </View>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
@@ -87,13 +117,14 @@ function TopNavigationHeader({
 function FlightScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();// State to store fetched destinations
   const [destinations, setDestinations] = useState<Destination[]>([]); // Define the type as an array of Destination objects
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     // Fetch the data when the component is mounted
     const fetchDestinations = async () => {
       try {
         const destinationCollection = collection(db, 'destinations');
-    const destinationSnapshot = await getDocs(destinationCollection);
+        const destinationSnapshot = await getDocs(destinationCollection);
 
         // Map over the documents and extract the data
         const destinationList = destinationSnapshot.docs.map((doc: QueryDocumentSnapshot)  => {
@@ -116,6 +147,14 @@ function FlightScreen() {
     fetchDestinations(); // Call the function to fetch destinations
   }, []);
 
+  const filteredDestinations = destinations.filter((destination) =>{
+    const searchText = searchQuery;
+    const name = destination.name;
+    const location = destination.location
+
+    // Vérifie si la requête de recherche correspond au nom ou à la localisation
+    return name==searchText ;
+  });
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
@@ -125,17 +164,21 @@ function FlightScreen() {
           placeholder="Where to go?"
           style={styles.searchInput}
           placeholderTextColor="#666"
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
         />
       </View>
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Discover Wonders</Text>
+      
           <TouchableOpacity onPress={() => navigation.navigate('Destinations')}>
             <Text style={styles.seeAll}>See all</Text>
 
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      
       {destinations.map((destination) => (
         <DestinationCard
           key={destination.id} // Use the document ID as the key for better performance
@@ -154,7 +197,9 @@ function FlightScreen() {
             <Text style={styles.seeAll}>See all</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
+        {/*<ScrollView horizontal={false} showsVerticalScrollIndicator={false}>*/}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          
         <MightlikeCard
           image={require('../assets/cap.png')}
           title="Cap Angela"
@@ -226,6 +271,8 @@ function FlightScreen() {
   );
 }
 
+
+
 function HotelsScreen() {
   return (
   <View style={styles.tabContainer}>
@@ -267,6 +314,78 @@ function FavouriteScreen() {
 
 export default function Home() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const [profileData, setProfileData] = useState<ProfileData>({
+    name: '',
+    email: '',
+    dateOfBirth: '',
+    country: '',
+    region: '',
+    points: 0,
+    level: ''
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const auth = getAuth();
+
+  useEffect(() => {
+    // Listen for changes in authentication state
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in
+        getUserProfile(user.uid); // Fetch profile data using the user's UID
+        console.log(user.uid);
+        const userRef = doc(firestore, "users", user.uid); 
+        console.log(userRef);
+      } else {
+        // User is signed out
+        setProfileData({
+          name: '',
+          email: '',
+          dateOfBirth: '',
+          country: '',
+          region: '',
+          points: 0,
+          level: '',
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const getUserProfile = async (userId: string) => {
+    const q = query(collection(firestore, 'users'), where('uid', '==', userId));
+
+    // Référence au document de l'utilisateur dans la collection 'users'
+    const userRef = doc(firestore, "users", "QrbMxf2UX8W4D80J7KW5"); 
+  
+    try {
+      // Récupère les documents correspondants à la requête
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // Si le document existe, on peut obtenir les données
+        const docSnap = querySnapshot.docs[0]; // On suppose qu'il n'y a qu'un seul document
+        const data = docSnap.data();
+        setProfileData({
+          name: data?.name || '',
+          email: data?.email || '',
+          dateOfBirth: data?.dateOfBirth || '',
+          country: data?.country || '',
+          region: data?.region || '',
+          points: data?.points || 0,
+          level: data?.level || '',
+        });
+      } else {
+        console.log('No such document!');
+        Alert.alert('No user data found. Please check if the user is properly registered.');
+      }
+    } catch (error) {
+      console.error('Error getting document:', error);
+      Alert.alert('Error retrieving user data. Please try again later.');
+    }
+  };
+
+  
   
   const [topNavIndex, setTopNavIndex] = useState(0);
   const [bottomNavIndex, setBottomNavIndex] = useState(0);
@@ -297,6 +416,7 @@ export default function Home() {
         topNavIndex={topNavIndex}
         setTopNavIndex={setTopNavIndex}
         topNavTabs={topNavTabs}
+        profileData={profileData}
         />
         <ScrollView showsVerticalScrollIndicator={false}>
           <CurrentTopNavComponent />
@@ -440,3 +560,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
 });
+function getUserProfile(uid: string) {
+  throw new Error('Function not implemented.');
+}
+

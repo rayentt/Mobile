@@ -2,6 +2,10 @@
 import React, { useState } from 'react';
 import { SafeAreaView, Text, View, StyleSheet, TextInput, TouchableOpacity, Alert, ImageBackground,Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native'; // Import navigation hook
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';  // Importing the firebase auth instance
+import { FirebaseError } from 'firebase/app';
+
 const Login  = ({ navigation }: any) => {
 
   //const navigation = useNavigation(); // Access the navigation prop
@@ -10,6 +14,32 @@ const Login  = ({ navigation }: any) => {
     email: '',
     password: '',
   });
+
+
+  const handleLogin = async () => {
+    const { email, password } = form;
+
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in both fields.');
+      return;
+    }
+
+    try {
+      // Sign in the user using Firebase Authentication
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      console.log('User signed in:', user);
+      
+
+      // If login is successful, navigate to Home
+      Alert.alert('Successfully logged in!');
+      navigation.navigate('Home'); // Navigate to Home screen after successful login
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Login Failed', error.message || 'An error occurred while logging in.');
+    }
+  };
+
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -67,12 +97,11 @@ const Login  = ({ navigation }: any) => {
             {/* Sign In button */}
             <View style={styles.formAction}>
               <TouchableOpacity
-                onPress={() => {
-                  // After successfully logging in, navigate to Home screen
-                  Alert.alert('Successfully logged in!');
-                  navigation.navigate('Home'); // Navigate to Home screen
-                }}
-              >
+                onPress={handleLogin}> 
+                 
+                  
+      
+              
                 <View style={styles.btn}>
                   <Text style={styles.btnText}>Sign In</Text>
                 </View>

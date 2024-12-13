@@ -1,7 +1,7 @@
-import React, { useState} from 'react';
+import React, { useState, useEffect} from 'react';
 import { StyleSheet, ScrollView, Image, Text, View, Dimensions,TextInput, 
   TouchableOpacity, 
-  FlatList } from 'react-native';
+  FlatList, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 //import YoutubePlayer from 'react-native-youtube-iframe';
 import { RouteProp } from '@react-navigation/native';
@@ -9,6 +9,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { Destination } from '../components/Destinations';
 import DestinationReview  from './DestinationReview'; // Import the DestinationReview component
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, updateDoc, arrayUnion, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { firestore } from '@/firebase';
 
 
 type ArticlePageRouteProp = RouteProp<RootStackParamList, 'ArticlePage'>;
@@ -18,8 +21,51 @@ type ArticlePageProps = {
 
 const ArticlePage = ({ route }: ArticlePageProps) => {
   const { place } = route.params;
+  const auth = getAuth();
+  const db = getFirestore();
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const checkIfFavorited = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const favouriteDestinations = userData?.favourites || [];
+        setIsFavorited(favouriteDestinations.includes(place.id));
+      }
+    }
+  };
 
 
+  useEffect(() => {
+    checkIfFavorited();
+  }, []);
+
+
+  const handleAddToFavorites = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        const q = query(collection(firestore, 'users'), where('uid', '==', user.uid));
+        const querySnapshot = await getDocs(q);
+        const docSnap = querySnapshot.docs[0];
+
+        const userDocRef = doc(db, 'users', docSnap.id); // Utilisez votre collection d'utilisateurs
+        
+        await updateDoc(userDocRef, {
+          favourites: arrayUnion(place.id)  // Ajouter l'ID de l'article aux favoris
+        });
+        setIsFavorited(true);
+        Alert.alert('Success', `${place.name} has been added to your favorites!`);
+      } catch (error) {
+        Alert.alert('Error', 'An error occurred while adding to favorites.');
+      }
+    } else {
+      Alert.alert('Error', 'You must be logged in to add to favorites.');
+    }
+  };
 
   return(
     <ScrollView style={styles.container}>
@@ -32,6 +78,10 @@ const ArticlePage = ({ route }: ArticlePageProps) => {
             <Text style={styles.ratingText}>{place.rating}</Text>
           </View>
         </View>
+        
+
+        
+
         <View style={styles.attractionsContainer}>
           {place.attractions.map((attraction, index) => (
             <View key={index} style={styles.attractionPill}>
@@ -39,8 +89,20 @@ const ArticlePage = ({ route }: ArticlePageProps) => {
             </View>
           ))}
         </View>
+
+        <TouchableOpacity
+          style={[styles.addButton, isFavorited && styles.favoritedButton]}
+          onPress={handleAddToFavorites}
+        >
+        <Text style={styles.addButtonText}>
+            {isFavorited ? 'Added to Favorites' : 'Add to Favorites'}
+          </Text>
+
+        </TouchableOpacity>
+        
         <Text style={styles.description}>{place.phrase}</Text>
       
+        
     
         <View style={styles.infoContainer}>
           <View style={styles.infoItem}>
@@ -214,7 +276,26 @@ const styles = StyleSheet.create({
     color: '#888',
     alignSelf: 'flex-end',
   },
-});
+  addButton: {
+    backgroundColor: '#007A8C',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
+    width:130,
+    marginBottom:20,
+    position:'relative',
+    left:160,
+  },
+  favoritedButton: {
+    backgroundColor: '#4CAF50', // Changer la couleur si ajouté aux favoris
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+},
+}
+);
 
 
 export default ArticlePage;

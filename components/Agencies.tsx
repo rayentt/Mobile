@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import { 
   View, 
   Text, 
@@ -6,73 +6,139 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   SafeAreaView, 
-  ScrollView 
+  ScrollView,
+  ActivityIndicator,
+  FlatList
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation'; // adjust path as needed
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 type AgenciesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Agencies'>;
 
 // Agency data type
 interface Agency {
-  id: number;
+  id: string; // ID de document dans Firestore
   name: string;
-  logo: any;
   description: string;
   specialties: string[];
   rating: number;
+  logo_url: string; // URL du logo
 }
 
+
+
+
+
+
+{/*}
 const agenciesData: Agency[] = [
   {
-    id: 1,
+    id: '1',
     name: 'Sahara Expeditions',
-    logo: require('../assets/sahara-expeditions-logo.png'),
+    logo_url: require('../assets/sahara-expeditions-logo.png'),
     description: 'Specialists in desert tours and adventures',
     specialties: ['Desert Tours', 'Camel Treks', 'Camping'],
     rating: 4.8
   },
   {
-    id: 2,
+    id: '2',
     name: 'Trivago',
-    logo: require('../assets/trivago-logo.jpg'),
+    logo_url: require('../assets/trivago-logo.jpg'),
     description: 'Comprehensive travel solutions across Tunisia',
     specialties: ['Cultural Tours', 'Beach Holidays', 'Group Travel'],
     rating: 4.5
   },
   {
-    id: 3,
+    id: '3',
     name: 'Travelocity',
-    logo: require('../assets/travelocity-logo.png'),
+    logo_url: require('../assets/travelocity-logo.png'),
     description: 'Exploring coastal and historic destinations',
     specialties: ['Coastal Tours', 'Historical Sites', 'Guided Walks'],
     rating: 4.7
   }
 ];
-const Agencies  = ({ navigation }: any) => {
- // const navigation = useNavigation<AgenciesScreenNavigationProp>();
+*/}
 
-  const renderAgencyCard = (agency: Agency) => (
+
+const Agencies: React.FC = () => {
+  const navigation = useNavigation<AgenciesScreenNavigationProp>();
+  const [agencies, setAgencies] = useState<Agency[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fonction pour récupérer les agences depuis Firestore
+  useEffect(() => {
+    const fetchAgencies = async () => {
+      try {
+        console.log("Fetching data from Firestore...");
+        const querySnapshot = await getDocs(collection(db, 'Agencies'));
+        
+        console.log("QuerySnapshot:", querySnapshot); // Log pour vérifier si `querySnapshot` est défini
+        console.log("Documents trouvés :", querySnapshot.docs);
+  
+        const data = querySnapshot.docs
+          .map((doc) => {
+            const docData = doc.data();
+
+            // Validate required fields
+            if (
+              typeof docData.name === 'string' &&
+              typeof docData.description === 'string' &&
+              Array.isArray(docData.specialties) &&
+              typeof docData.rating === 'number' &&
+              typeof docData.logo_url === 'string'
+            ) {
+              return {
+                id: doc.id,
+                name: docData.name,
+                description: docData.description,
+                specialties: docData.specialties,
+                rating: docData.rating,
+                logo_url: docData.logo_url,
+              };
+            }
+            return null; // Skip invalid documents
+          })
+          .filter((agency): agency is Agency => agency !== null); // Filter out null values
+
+        console.log("Documents fetched:", data);
+        setAgencies(data);
+      } catch (error) {
+        console.error("Error fetching agencies:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAgencies();
+  }, []);
+
+
+  
+  
+  
+  const renderAgencyItem = ({ item }: { item: Agency })  => (
     <TouchableOpacity 
-      key={agency.id} 
       style={styles.agencyCard}
-      onPress={() => {/* Navigate to agency details screen */}}
+      onPress={() => {/*navigation.navigate('AgencyDetails', { agencyId: agency.id }); // Naviguer vers les détails de l'agence
+    }}*/}}
     >
       <View style={styles.agencyCardHeader}>
-        <Image source={agency.logo} style={styles.agencyLogo} />
+        <Image source={{ uri: item.logo_url }}  style={styles.agencyLogo} />
         <View>
-          <Text style={styles.agencyName}>{agency.name}</Text>
+          <Text style={styles.agencyName}>{item.name}</Text>
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={16} color="#FFC107" />
-            <Text style={styles.ratingText}>{agency.rating}</Text>
+            <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
           </View>
         </View>
       </View>
-      <Text style={styles.agencyDescription}>{agency.description}</Text>
+      <Text style={styles.agencyDescription}>{item.description}</Text>
       <View style={styles.specialtiesContainer}>
-        {agency.specialties.map((specialty, index) => (
+        {item.specialties.map((specialty, index) => (
           <View key={index} style={styles.specialtyPill}>
             <Text style={styles.specialtyText}>{specialty}</Text>
           </View>
@@ -83,25 +149,36 @@ const Agencies  = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Travel Agencies</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" />
-        <Text style={styles.searchPlaceholder}>Search agencies...</Text>
-      </View>
-
-      <ScrollView 
-        style={styles.agenciesContainer}
-        showsVerticalScrollIndicator={false}
-      >
-     {agenciesData.map(renderAgencyCard)}
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator size="large" color="#336749" style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={agencies}
+          renderItem={renderAgencyItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.agenciesContainer}
+          ListHeaderComponent={
+            <>
+              <View style={styles.header}>
+                <Text style={styles.headerTitle}>Travel Agencies</Text>
+              </View>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#666" />
+                <Text style={styles.searchPlaceholder}>Search agencies...</Text>
+              </View>
+            </>
+          }
+          ListFooterComponent={
+            <View style={{ padding: 16 }}>
+              <Text style={{ textAlign: 'center', color: '#666' }}>End of List</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
-}
+};
+
 
 const styles = StyleSheet.create({
   container: {
